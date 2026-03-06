@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpreadLog • Option Trading Journal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .trade-table tr:hover { background-color: #f8fafc; }
+        .modal { animation: modalPop 0.3s ease; }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .profit { color: #10b981; }
+        .loss { color: #ef4444; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight flex items-center gap-3">
+                    <i class="fa-solid fa-chart-line text-emerald-500"></i>
+                    SpreadLog
+                </h1>
+                <p class="text-zinc-400 text-sm mt-1">Credit &amp; Debit Spread Trading Journal • Live Yahoo Finance prices</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="refreshAllPrices()" 
+                        class="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-2xl text-sm font-medium transition">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    Refresh All Prices
+                </button>
+                <button onclick="showAddModal()" 
+                        class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-2xl text-sm font-semibold transition">
+                    <i class="fa-solid fa-plus"></i>
+                    New Trade
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-zinc-800 mb-6">
+            <button onclick="switchTab(0)" id="tab-0"
+                    class="tab-button px-8 py-4 font-semibold text-lg border-b-2 border-emerald-500 text-emerald-400">Credit Spreads</button>
+            <button onclick="switchTab(1)" id="tab-1"
+                    class="tab-button px-8 py-4 font-semibold text-lg text-zinc-400">Debit Spreads</button>
+        </div>
+
+        <!-- Tables -->
+        <div id="credit-section">
+            <div class="overflow-x-auto rounded-3xl border border-zinc-800 bg-zinc-900">
+                <table class="w-full trade-table">
+                    <thead>
+                        <tr class="border-b border-zinc-800 text-xs uppercase tracking-widest text-zinc-500">
+                            <th class="px-6 py-5 text-left">Entry</th>
+                            <th class="px-6 py-5 text-left">Strategy</th>
+                            <th class="px-6 py-5 text-left">Symbol</th>
+                            <th class="px-6 py-5 text-center">Rem DTE</th>
+                            <th class="px-6 py-5 text-center">Type</th>
+                            <th class="px-6 py-5 text-right">Short / Long</th>
+                            <th class="px-6 py-5 text-right">Unreal P/L</th>
+                            <th class="px-6 py-5 text-right">Margin</th>
+                            <th class="px-6 py-5 text-center">50% Hit</th>
+                            <th class="px-6 py-5 text-right">Speed ($/day)</th>
+                            <th class="px-6 py-5 text-right">Unreal Ann %</th>
+                            <th class="px-6 py-5 text-right">Proj Ann %</th>
+                            <th class="px-6 py-5 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="credit-body" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="debit-section" class="hidden">
+            <div class="overflow-x-auto rounded-3xl border border-zinc-800 bg-zinc-900">
+                <table class="w-full trade-table">
+                    <thead>
+                        <tr class="border-b border-zinc-800 text-xs uppercase tracking-widest text-zinc-500">
+                            <th class="px-6 py-5 text-left">Entry</th>
+                            <th class="px-6 py-5 text-left">Strategy</th>
+                            <th class="px-6 py-5 text-left">Symbol</th>
+                            <th class="px-6 py-5 text-center">Rem DTE</th>
+                            <th class="px-6 py-5 text-center">Type</th>
+                            <th class="px-6 py-5 text-right">Short / Long</th>
+                            <th class="px-6 py-5 text-right">Unreal P/L</th>
+                            <th class="px-6 py-5 text-right">Margin</th>
+                            <th class="px-6 py-5 text-center">50% Hit</th>
+                            <th class="px-6 py-5 text-right">Speed ($/day)</th>
+                            <th class="px-6 py-5 text-right">Unreal Ann %</th>
+                            <th class="px-6 py-5 text-right">Proj Ann %</th>
+                            <th class="px-6 py-5 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="debit-body" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="mt-8 grid grid-cols-4 gap-6">
+            <div class="bg-zinc-900 rounded-3xl p-6 border border-zinc-800">
+                <div class="text-xs text-zinc-500">TOTAL TRADES</div>
+                <div id="total-trades" class="text-5xl font-bold mt-2">0</div>
+            </div>
+            <div class="bg-zinc-900 rounded-3xl p-6 border border-zinc-800">
+                <div class="text-xs text-zinc-500">OPEN P/L TODAY</div>
+                <div id="total-pl" class="text-5xl font-bold mt-2 text-emerald-400">$0</div>
+            </div>
+            <div class="bg-zinc-900 rounded-3xl p-6 border border-zinc-800">
+                <div class="text-xs text-zinc-500">AVG ANN RETURN</div>
+                <div id="avg-ann" class="text-5xl font-bold mt-2">0%</div>
+            </div>
+            <div class="bg-zinc-900 rounded-3xl p-6 border border-zinc-800">
+                <div class="text-xs text-zinc-500">50% HITS</div>
+                <div id="fifty-hits" class="text-5xl font-bold mt-2">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
+        <div class="modal bg-zinc-900 rounded-3xl w-full max-w-2xl mx-4 overflow-hidden">
+            <div class="px-8 py-6 border-b border-zinc-800 flex items-center justify-between">
+                <h3 id="modal-title" class="text-2xl font-semibold">New Credit Spread</h3>
+                <button onclick="hideModal()" class="text-3xl leading-none text-zinc-500 hover:text-white">×</button>
+            </div>
+            
+            <div class="p-8 grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Spread Type</label>
+                    <select id="spread-type" onchange="updateModalTitle()" 
+                            class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                        <option value="credit">Credit Spread</option>
+                        <option value="debit">Debit Spread</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Symbol</label>
+                    <input id="symbol" type="text" placeholder="SPY" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg uppercase">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Expiration Date</label>
+                    <input id="expiry" type="date" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Strategy Name</label>
+                    <input id="strategy" type="text" placeholder="Bull Put 420/410" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Option Type</label>
+                    <select id="option-type" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                        <option value="put">PUT</option>
+                        <option value="call">CALL</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Contracts</label>
+                    <input id="contracts" type="number" value="1" min="1"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Short Strike</label>
+                    <input id="short-strike" type="number" step="0.01" placeholder="420" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Long Strike</label>
+                    <input id="long-strike" type="number" step="0.01" placeholder="410" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Short Entry Premium</label>
+                    <input id="short-prem" type="number" step="0.01" placeholder="2.45" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Long Entry Premium</label>
+                    <input id="long-prem" type="number" step="0.01" placeholder="1.10" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Entry Date</label>
+                    <input id="entry-date" type="date" 
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-3 text-lg">
+                </div>
+            </div>
+
+            <div class="bg-zinc-950 px-8 py-6 flex justify-end gap-4 border-t border-zinc-800">
+                <button onclick="hideModal()" 
+                        class="px-8 py-3.5 text-zinc-400 hover:text-white font-medium">Cancel</button>
+                <button onclick="saveTrade()" 
+                        class="px-10 py-3.5 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold">Save Trade</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tailwind script init
+        function initTailwind() {
+            tailwind.config = {
+                content: [],
+                theme: { extend: {} }
+            }
+        }
+        initTailwind()
+
+        let trades = []
+        let editingId = null
+        let currentTab = 0
+
+        const STORAGE_KEY = 'spreadlog_trades'
+
+        function loadTrades() {
+            const saved = localStorage.getItem(STORAGE_KEY)
+            trades = saved ? JSON.parse(saved) : []
+            renderTables()
+            updateStats()
+        }
+
+        function saveTrades() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(trades))
+            renderTables()
+            updateStats()
+        }
+
+        function calculateDTE(expiryStr) {
+            const exp = new Date(expiryStr)
+            const now = new Date()
+            const diff = exp - now
+            return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+        }
+
+        function calculateDaysHeld(entryStr) {
+            const entry = new Date(entryStr)
+            const now = new Date()
+            const diff = now - entry
+            return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)))
+        }
+
+        // Near real-time price fetch using Yahoo Finance + public CORS proxy (no API key!)
+        async function fetchCurrentPremium(symbol, expiryStr, strike, isCall) {
+            try {
+                const expDate = new Date(expiryStr)
+                const expUnix = Math.floor(expDate.getTime() / 1000)
+                
+                const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/options/${symbol.toUpperCase()}?date=${expUnix}`
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`
+                
+                const res = await fetch(proxyUrl)
+                if (!res.ok) throw new Error('Yahoo API error')
+                
+                const data = await res.json()
+                const chain = data.optionChain.result[0]
+                if (!chain) throw new Error('No data')
+                
+                const options = chain.options[0]
+                const legs = isCall ? options.calls : options.puts
+                
+                const match = legs.find(o => Math.abs(o.strike - parseFloat(strike)) < 0.05)
+                if (!match) return 0
+                
+                // Prefer mid-price (bid + ask)/2, fallback to lastPrice
+                let price = (match.bid + match.ask) / 2
+                if (price <= 0 || isNaN(price)) price = match.lastPrice || 0
+                return parseFloat(price.toFixed(2))
+            } catch (e) {
+                console.warn(`Price fetch failed for ${symbol}:`, e.message)
+                return 0 // fallback - user can manually edit if needed
+            }
+        }
+
+        async function updateTradePrices(tradeId) {
+            const trade = trades.find(t => t.id === tradeId)
+            if (!trade) return
+            
+            const isCall = trade.optionType === 'call'
+            
+            // Fetch both legs in parallel
+            const [shortPrice, longPrice] = await Promise.all([
+                fetchCurrentPremium(trade.symbol, trade.expiry, trade.shortStrike, isCall),
+                fetchCurrentPremium(trade.symbol, trade.expiry, trade.longStrike, isCall)
+            ])
+            
+            trade.currentShortPrem = shortPrice
+            trade.currentLongPrem = longPrice
+            trade.lastPriceUpdate = new Date().toISOString()
+            
+            saveTrades()
+        }
+
+        async function refreshAllPrices() {
+            const promises = trades.map(t => updateTradePrices(t.id))
+            await Promise.all(promises)
+            alert("✅ All prices refreshed from Yahoo Finance!")
+        }
+
+        function getCurrentNet(trade) {
+            const s = trade.currentShortPrem || 0
+            const l = trade.currentLongPrem || 0
+            return trade.spreadType === 'credit' ? (s - l) : (l - s)
+        }
+
+        function getEntryNet(trade) {
+            const s = parseFloat(trade.shortPrem)
+            const l = parseFloat(trade.longPrem)
+            return trade.spreadType === 'credit' ? (s - l) : (l - s)
+        }
+
+        function calculateMetrics(trade) {
+            const width = Math.abs(parseFloat(trade.shortStrike) - parseFloat(trade.longStrike))
+            const contracts = parseInt(trade.contracts) || 1
+            const entryNet = getEntryNet(trade)
+            const currentNet = getCurrentNet(trade)
+            
+            let unrealPnl = 0
+            let margin = 0
+            let maxProfit = 0
+            
+            if (trade.spreadType === 'credit') {
+                unrealPnl = (entryNet - currentNet) * 100 * contracts
+                margin = (width - entryNet) * 100 * contracts
+                maxProfit = entryNet * 100 * contracts
+            } else { // debit
+                unrealPnl = (currentNet - entryNet) * 100 * contracts
+                margin = entryNet * 100 * contracts
+                maxProfit = (width - entryNet) * 100 * contracts
+            }
+            
+            const daysHeld = calculateDaysHeld(trade.entryDate)
+            const remDTE = calculateDTE(trade.expiry)
+            const initialDTE = Math.ceil((new Date(trade.expiry) - new Date(trade.entryDate)) / (1000*60*60*24))
+            
+            const speed = daysHeld > 0 ? (unrealPnl / daysHeld) : 0
+            
+            let unrealAnn = 0
+            if (daysHeld > 0 && margin > 0) {
+                unrealAnn = (unrealPnl / margin) * (365 / daysHeld) * 100
+            }
+            
+            let projAnn = 0
+            if (initialDTE > 0 && margin > 0) {
+                projAnn = (maxProfit / margin) * (365 / initialDTE) * 100
+            }
+            
+            const percentToMax = maxProfit > 0 ? (unrealPnl / maxProfit) * 100 : 0
+            const fiftyHit = percentToMax >= 50
+            
+            return {
+                unrealPnl: parseFloat(unrealPnl.toFixed(0)),
+                margin: parseFloat(margin.toFixed(0)),
+                speed: parseFloat(speed.toFixed(0)),
+                unrealAnn: parseFloat(unrealAnn.toFixed(1)),
+                projAnn: parseFloat(projAnn.toFixed(1)),
+                remDTE,
+                fiftyHit,
+                percentToMax: parseFloat(percentToMax.toFixed(0))
+            }
+        }
+
+        function renderRow(trade) {
+            const m = calculateMetrics(trade)
+            const isCredit = trade.spreadType === 'credit'
+            
+            const row = document.createElement('tr')
+            row.className = 'border-b border-zinc-800 last:border-0'
+            row.innerHTML = `
+                <td class="px-6 py-5">${new Date(trade.entryDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</td>
+                <td class="px-6 py-5 font-medium">${trade.strategy}</td>
+                <td class="px-6 py-5 font-mono text-emerald-300">${trade.symbol}</td>
+                <td class="px-6 py-5 text-center font-mono">${m.remDTE}</td>
+                <td class="px-6 py-5 text-center">
+                    <span class="inline-block px-3 py-1 text-[10px] font-bold rounded-full ${trade.optionType === 'call' ? 'bg-amber-900 text-amber-300' : 'bg-purple-900 text-purple-300'}">
+                        ${trade.optionType.toUpperCase()}
+                    </span>
+                </td>
+                <td class="px-6 py-5 text-right font-mono text-xs">
+                    ${trade.shortStrike} @ ${trade.shortPrem}<br>
+                    ${trade.longStrike} @ ${trade.longPrem}
+                    <div class="text-[10px] text-zinc-500 mt-1">
+                        NOW: ${trade.currentShortPrem || '—'} / ${trade.currentLongPrem || '—'}
+                    </div>
+                </td>
+                <td class="px-6 py-5 text-right font-semibold ${m.unrealPnl >= 0 ? 'profit' : 'loss'}">
+                    $${m.unrealPnl.toLocaleString()}
+                </td>
+                <td class="px-6 py-5 text-right font-mono">$${m.margin.toLocaleString()}</td>
+                <td class="px-6 py-5 text-center">
+                    ${m.fiftyHit ? 
+                        `<span class="inline-flex items-center gap-1 bg-emerald-900 text-emerald-300 px-3 py-1 rounded-2xl text-xs font-bold"><i class="fa-solid fa-flag-checkered"></i> 50%</span>` : 
+                        `<span class="text-zinc-600 text-xs">${m.percentToMax}%</span>`}
+                </td>
+                <td class="px-6 py-5 text-right font-mono">$${m.speed}</td>
+                <td class="px-6 py-5 text-right font-mono ${m.unrealAnn >= 0 ? 'profit' : 'loss'}">${m.unrealAnn}%</td>
+                <td class="px-6 py-5 text-right font-mono text-violet-400">${m.projAnn}%</td>
+                <td class="px-6 py-5 text-center">
+                    <div class="flex gap-3 justify-center">
+                        <button onclick="editTrade('${trade.id}')" class="text-zinc-400 hover:text-white">
+                            <i class="fa-solid fa-pen text-sm"></i>
+                        </button>
+                        <button onclick="updateTradePrices('${trade.id}'); event.stopImmediatePropagation()" class="text-amber-400 hover:text-amber-300">
+                            <i class="fa-solid fa-sync text-sm"></i>
+                        </button>
+                        <button onclick="deleteTrade('${trade.id}')" class="text-red-400 hover:text-red-300">
+                            <i class="fa-solid fa-trash text-sm"></i>
+                        </button>
+                    </div>
+                </td>
+            `
+            return row
+        }
+
+        function renderTables() {
+            const creditBody = document.getElementById('credit-body')
+            const debitBody = document.getElementById('debit-body')
+            
+            creditBody.innerHTML = ''
+            debitBody.innerHTML = ''
+            
+            trades.forEach(trade => {
+                const row = renderRow(trade)
+                if (trade.spreadType === 'credit') {
+                    creditBody.appendChild(row)
+                } else {
+                    debitBody.appendChild(row)
+                }
+            })
+        }
+
+        function updateStats() {
+            let totalTrades = trades.length
+            let totalPL = 0
+            let annSum = 0
+            let fiftyCount = 0
+            
+            trades.forEach(trade => {
+                const m = calculateMetrics(trade)
+                totalPL += m.unrealPnl
+                annSum += m.unrealAnn
+                if (m.fiftyHit) fiftyCount++
+            })
+            
+            const avgAnn = totalTrades > 0 ? (annSum / totalTrades).toFixed(1) : 0
+            
+            document.getElementById('total-trades').textContent = totalTrades
+            document.getElementById('total-pl').textContent = '$' + totalPL.toLocaleString()
+            document.getElementById('avg-ann').textContent = avgAnn + '%'
+            document.getElementById('fifty-hits').textContent = fiftyCount
+        }
+
+        function showAddModal() {
+            editingId = null
+            document.getElementById('modal-title').textContent = 'New Credit Spread'
+            document.getElementById('spread-type').value = 'credit'
+            
+            // default values
+            const today = new Date().toISOString().split('T')[0]
+            document.getElementById('entry-date').value = today
+            document.getElementById('expiry').value = ''
+            document.getElementById('symbol').value = 'SPY'
+            document.getElementById('strategy').value = ''
+            document.getElementById('short-strike').value = ''
+            document.getElementById('long-strike').value = ''
+            document.getElementById('short-prem').value = ''
+            document.getElementById('long-prem').value = ''
+            document.getElementById('contracts').value = '1'
+            
+            document.getElementById('modal').classList.remove('hidden')
+            document.getElementById('modal').classList.add('flex')
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('modal')
+            modal.classList.add('hidden')
+            modal.classList.remove('flex')
+        }
+
+        function updateModalTitle() {
+            const type = document.getElementById('spread-type').value
+            document.getElementById('modal-title').textContent = `New ${type === 'credit' ? 'Credit' : 'Debit'} Spread`
+        }
+
+        function saveTrade() {
+            const spreadType = document.getElementById('spread-type').value
+            const symbol = document.getElementById('symbol').value.toUpperCase().trim()
+            const expiry = document.getElementById('expiry').value
+            const strategy = document.getElementById('strategy').value.trim()
+            const optionType = document.getElementById('option-type').value
+            const contracts = parseInt(document.getElementById('contracts').value) || 1
+            const shortStrike = parseFloat(document.getElementById('short-strike').value)
+            const longStrike = parseFloat(document.getElementById('long-strike').value)
+            const shortPrem = parseFloat(document.getElementById('short-prem').value)
+            const longPrem = parseFloat(document.getElementById('long-prem').value)
+            const entryDate = document.getElementById('entry-date').value || new Date().toISOString().split('T')[0]
+            
+            if (!symbol || !expiry || !shortStrike || !longStrike || isNaN(shortPrem) || isNaN(longPrem)) {
+                alert("Please fill all required fields")
+                return
+            }
+            
+            const tradeData = {
+                id: editingId || 'trade_' + Date.now(),
+                spreadType,
+                symbol,
+                expiry,
+                strategy: strategy || `${shortStrike}/${longStrike} ${optionType}`,
+                optionType,
+                contracts,
+                shortStrike,
+                longStrike,
+                shortPrem,
+                longPrem,
+                entryDate,
+                currentShortPrem: 0,
+                currentLongPrem: 0,
+                lastPriceUpdate: null
+            }
+            
+            if (editingId) {
+                const idx = trades.findIndex(t => t.id === editingId)
+                if (idx !== -1) trades[idx] = tradeData
+            } else {
+                trades.push(tradeData)
+            }
+            
+            saveTrades()
+            hideModal()
+            
+            // Auto-refresh prices for new trade
+            if (!editingId) {
+                setTimeout(() => {
+                    updateTradePrices(tradeData.id)
+                }, 800)
+            }
+        }
+
+        function editTrade(id) {
+            const trade = trades.find(t => t.id === id)
+            if (!trade) return
+            
+            editingId = id
+            document.getElementById('spread-type').value = trade.spreadType
+            document.getElementById('symbol').value = trade.symbol
+            document.getElementById('expiry').value = trade.expiry
+            document.getElementById('strategy').value = trade.strategy
+            document.getElementById('option-type').value = trade.optionType
+            document.getElementById('contracts').value = trade.contracts
+            document.getElementById('short-strike').value = trade.shortStrike
+            document.getElementById('long-strike').value = trade.longStrike
+            document.getElementById('short-prem').value = trade.shortPrem
+            document.getElementById('long-prem').value = trade.longPrem
+            document.getElementById('entry-date').value = trade.entryDate
+            
+            document.getElementById('modal-title').textContent = `Edit ${trade.spreadType === 'credit' ? 'Credit' : 'Debit'} Spread`
+            document.getElementById('modal').classList.remove('hidden')
+            document.getElementById('modal').classList.add('flex')
+        }
+
+        function deleteTrade(id) {
+            if (!confirm('Delete this trade record permanently?')) return
+            trades = trades.filter(t => t.id !== id)
+            saveTrades()
+        }
+
+        function switchTab(tab) {
+            currentTab = tab
+            document.getElementById('credit-section').classList.toggle('hidden', tab !== 0)
+            document.getElementById('debit-section').classList.toggle('hidden', tab !== 1)
+            
+            document.querySelectorAll('.tab-button').forEach((btn, i) => {
+                if (i === tab) {
+                    btn.classList.add('border-b-2', 'border-emerald-500', 'text-emerald-400')
+                } else {
+                    btn.classList.remove('border-b-2', 'border-emerald-500', 'text-emerald-400')
+                }
+            })
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.metaKey && e.key === 'k') {
+                e.preventDefault()
+                showAddModal()
+            }
+        })
+
+        // Initial load
+        window.onload = function() {
+            loadTrades()
+            switchTab(0)
+            
+            // Demo trade if empty (for first time users)
+            if (trades.length === 0) {
+                console.log('%c👋 Welcome to SpreadLog! Add your first trade with the button above.', 'color:#10b981; font-size:13px')
+            }
+            
+            // Auto refresh prices every 10 minutes (optional)
+            setInterval(() => {
+                if (trades.length > 0) refreshAllPrices()
+            }, 10 * 60 * 1000)
+        }
+    </script>
+</body>
+</html>
